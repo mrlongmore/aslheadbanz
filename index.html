@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>School Headbanz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { touch-action: none; font-family: sans-serif; overflow: hidden; transition: background-color 0.3s ease; }
+        .bg-correct { background-color: #22c55e !important; }
+        .bg-pass { background-color: #ef4444 !important; }
+        #word-display { text-shadow: 2px 4px 10px rgba(0,0,0,0.3); }
+    </style>
+</head>
+<body class="bg-blue-600 text-white flex items-center justify-center h-screen w-screen p-4">
+
+    <div id="start-screen" class="text-center max-w-md">
+        <h1 class="text-5xl font-extrabold mb-4">SCHOOL HEADBANZ 🏫</h1>
+        <p class="mb-8 text-lg opacity-90">Tilt <b>DOWN</b> for Correct ✅<br>Tilt <b>UP</b> to Pass ⏭️</p>
+        <button onclick="requestPermissions()" class="bg-white text-blue-600 px-12 py-5 rounded-full font-black text-2xl shadow-2xl active:scale-95 transition-transform">
+            START 60s ROUND
+        </button>
+    </div>
+
+    <div id="countdown-screen" class="hidden text-center">
+        <div id="countdown-number" class="text-9xl font-black">3</div>
+        <p class="text-2xl mt-4 uppercase tracking-widest">Place on forehead!</p>
+    </div>
+
+    <div id="game-screen" class="hidden text-center w-full">
+        <div class="absolute top-6 left-0 w-full flex justify-between px-10 items-center">
+            <div id="timer" class="text-4xl font-mono font-bold bg-black/20 px-4 py-2 rounded-lg">60</div>
+            <div id="score-counter" class="text-4xl font-bold">Score: 0</div>
+        </div>
+        <div id="word-display" class="text-6xl md:text-8xl font-black leading-tight uppercase"></div>
+        <div id="status-hint" class="absolute bottom-10 w-full text-xl opacity-60">Tilt to answer</div>
+    </div>
+
+    <div id="end-screen" class="hidden text-center">
+        <h2 class="text-4xl font-bold mb-2">TIME'S UP! 🔔</h2>
+        <div id="final-score" class="text-8xl font-black my-6">0</div>
+        <p class="text-xl mb-8">Points Scored</p>
+        <button onclick="location.reload()" class="bg-white text-blue-600 px-10 py-4 rounded-full font-bold text-xl">
+            PLAY AGAIN
+        </button>
+    </div>
+
+    <script>
+        const wordList = [
+            "CLASS 🏫", "TAKE-UP 📝", "AGRICULTURE 🚜", "ALGEBRA ➗", 
+            "HUMAN ANATOMY 🦴", "ART 🎨", "AUTO SHOP 🏎️", "BIOLOGY 🧬", 
+            "CHEMISTRY 🧪", "COMPUTER SCIENCE 💻", "COOKING 🧑‍🍳", "DESIGN 📐", 
+            "ENGINEERING ⚙️", "ENGLISH 📚", "GEOMETRY 📐", "HISTORY 📜", 
+            "INTEGRATED MATH 🔢", "MATH ➕", "METAL SHOP 🛠️", "MUSIC/BAND 🎺", 
+            "PE ⚽", "PHYSICS ⚛️", "SCIENCE 🧪", "STATISTICS 📊", 
+            "STUDY 📖", "WOOD SHOP 🪵"
+        ];
+
+        let words = [...wordList];
+        let score = 0;
+        let timeLeft = 60;
+        let gameActive = false;
+        let canAction = true;
+        let timerInterval;
+
+        async function requestPermissions() {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                const response = await DeviceOrientationEvent.requestPermission();
+                if (response === 'granted') startSequence();
+            } else {
+                startSequence();
+            }
+        }
+
+        function startSequence() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('countdown-screen').classList.remove('hidden');
+            let count = 3;
+            const countInt = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    document.getElementById('countdown-number').innerText = count;
+                } else {
+                    clearInterval(countInt);
+                    startGame();
+                }
+            }, 1000);
+        }
+
+        function startGame() {
+            words = words.sort(() => Math.random() - 0.5);
+            document.getElementById('countdown-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            gameActive = true;
+            nextWord();
+            
+            window.addEventListener('deviceorientation', handleOrientation);
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').innerText = timeLeft;
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+
+            if ('wakeLock' in navigator) navigator.wakeLock.request('screen');
+        }
+
+        function nextWord() {
+            if (words.length === 0) words = [...wordList].sort(() => Math.random() - 0.5);
+            const word = words.pop();
+            document.getElementById('word-display').innerText = word;
+            document.body.className = "bg-blue-600 text-white flex items-center justify-center h-screen";
+        }
+
+        function handleOrientation(event) {
+            if (!gameActive || !canAction) return;
+            const tilt = event.beta; 
+
+            if (tilt < 25) { // TILT DOWN
+                score++;
+                document.getElementById('score-counter').innerText = `Score: ${score}`;
+                triggerAction('bg-correct');
+            } else if (tilt > 155) { // TILT UP
+                triggerAction('bg-pass');
+            }
+        }
+
+        function triggerAction(className) {
+            canAction = false;
+            document.body.classList.add(className);
+            if (navigator.vibrate) navigator.vibrate(200);
+
+            setTimeout(() => {
+                nextWord();
+                setTimeout(() => { canAction = true; }, 1000); // 1s cooldown
+            }, 600);
+        }
+
+        function endGame() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            if (navigator.vibrate) navigator.vibrate([500, 100, 500]);
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+            document.body.className = "bg-slate-900 text-white flex items-center justify-center h-screen";
+        }
+    </script>
+</body>
+</html>
