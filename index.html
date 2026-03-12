@@ -1,21 +1,234 @@
-function handleOrientation(event) {
-            if (!gameActive || !canAction) return;
-
-            // In many mobile browsers, when in landscape, 
-            // 'beta' represents the front-to-back tilt.
-            const currentTilt = event.beta; 
-            const relativeTilt = currentTilt - baseBeta;
-
-            // SWAPPED LOGIC: 
-            // If tilting towards the floor (down) was 'Pass', 
-            // we now use '<' to make it 'Correct'.
-            if (relativeTilt < -30) { 
-                // TILT DOWN (Towards floor) -> CORRECT
-                score++;
-                document.getElementById('score-counter').innerText = `Score: ${score}`;
-                triggerAction('bg-correct', 'CORRECT! ✅');
-            } else if (relativeTilt > 30) { 
-                // TILT UP (Towards sky) -> PASS
-                triggerAction('bg-pass', 'PASS ⏭️');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>School Headbanz 🏫</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { 
+            touch-action: none; 
+            font-family: 'Inter', system-ui, sans-serif; 
+            overflow: hidden; 
+            transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background-color: #1e40af; /* Default Blue */
+        }
+        .bg-correct { background-color: #16a34a !important; } /* Success Green */
+        .bg-pass { background-color: #dc2626 !important; }    /* Danger Red */
+        
+        /* Orientation Lock UI */
+        #orientation-warning { display: none; }
+        @media screen and (orientation: portrait) {
+            #orientation-warning { 
+                display: flex; position: fixed; inset: 0; background: #1e3a8a; 
+                z-index: 9999; flex-direction: column; align-items: center; justify-content: center;
+                text-align: center; padding: 2rem;
             }
         }
+
+        .word-shrink { font-size: 10vw; transition: font-size 0.2s; }
+        @media (min-width: 768px) { .word-shrink { font-size: 8rem; } }
+    </style>
+</head>
+<body class="text-white flex items-center justify-center h-screen w-screen m-0 p-0">
+
+    <!-- Orientation Overlay -->
+    <div id="orientation-warning">
+        <div class="animate-bounce text-6xl mb-6">🔄</div>
+        <h2 class="text-3xl font-black mb-2">ROTATE PHONE</h2>
+        <p class="text-lg opacity-80">Please turn your phone sideways to play!</p>
+    </div>
+
+    <!-- 1. Start Screen -->
+    <div id="start-screen" class="text-center p-6 max-w-2xl">
+        <h1 class="text-6xl font-black mb-4 tracking-tight text-yellow-300">SCHOOL HEADBANZ</h1>
+        <div class="bg-white/10 backdrop-blur-md p-6 rounded-3xl mb-8 border border-white/20">
+            <p class="text-xl mb-4 font-bold">How to play:</p>
+            <ul class="text-left space-y-3 text-lg">
+                <li>📍 Hold phone to forehead sideways.</li>
+                <li>✅ Tilt <span class="text-green-400 font-bold underline">DOWN</span> (floor) for Correct.</li>
+                <li>⏭️ Tilt <span class="text-red-400 font-bold underline">UP</span> (sky) to Pass.</li>
+            </ul>
+        </div>
+        <button onclick="initGame()" class="bg-yellow-400 hover:bg-yellow-300 text-blue-900 px-14 py-6 rounded-full font-black text-3xl shadow-[0_10px_0_rgb(202,138,4)] active:translate-y-1 active:shadow-none transition-all">
+            START 60s ROUND
+        </button>
+    </div>
+
+    <!-- 2. Countdown Screen -->
+    <div id="countdown-screen" class="hidden text-center">
+        <div id="countdown-number" class="text-[15rem] font-black leading-none">3</div>
+        <p class="text-3xl font-bold uppercase tracking-widest animate-pulse">Place on Forehead!</p>
+    </div>
+
+    <!-- 3. Active Game Screen -->
+    <div id="game-screen" class="hidden text-center w-full">
+        <div class="absolute top-0 left-0 w-full p-6 flex justify-between items-start pointer-events-none">
+            <div class="bg-black/40 backdrop-blur-md p-4 rounded-2xl">
+                <p class="text-xs uppercase opacity-70 font-bold">Time</p>
+                <p id="timer" class="text-4xl font-mono font-bold text-yellow-300">60</p>
+            </div>
+            <div class="bg-black/40 backdrop-blur-md p-4 rounded-2xl">
+                <p class="text-xs uppercase opacity-70 font-bold">Score</p>
+                <p id="score-counter" class="text-4xl font-bold">0</p>
+            </div>
+        </div>
+        
+        <div id="word-display" class="word-shrink font-black px-12 leading-tight uppercase select-none"></div>
+        
+        <div class="absolute bottom-10 w-full opacity-40 text-sm font-bold tracking-tighter italic">
+            DOWN = CORRECT | UP = PASS
+        </div>
+    </div>
+
+    <!-- 4. Final Score Screen -->
+    <div id="end-screen" class="hidden text-center p-6">
+        <h2 class="text-4xl font-black mb-2 opacity-80 uppercase">Round Over!</h2>
+        <div class="text-2xl font-bold text-yellow-300 mb-2">YOU SCORED</div>
+        <div id="final-score" class="text-[12rem] font-black leading-none mb-8">0</div>
+        <button onclick="window.location.reload()" class="bg-white text-blue-700 px-12 py-5 rounded-full font-black text-2xl shadow-xl hover:scale-105 transition-transform">
+            PLAY AGAIN
+        </button>
+    </div>
+
+    <script>
+        const WORD_LIST = [
+            "CLASS 🏫", "TAKE-UP 📝", "AGRICULTURE 🚜", "ALGEBRA ➗", "HUMAN ANATOMY 🦴", 
+            "ART 🎨", "AUTO SHOP 🏎️", "BIOLOGY 🧬", "CHEMISTRY 🧪", "COMPUTER SCIENCE 💻", 
+            "COOKING 🧑‍🍳", "DESIGN 📐", "ENGINEERING ⚙️", "ENGLISH 📚", "GEOMETRY 📐", 
+            "HISTORY 📜", "INTEGRATED MATH 🔢", "MATH ➕", "METAL SHOP 🛠️", 
+            "MUSIC/BAND 🎺", "PE ⚽", "PHYSICS ⚛️", "SCIENCE 🧪", "STATISTICS 📊", 
+            "STUDY 📖", "WOOD SHOP 🪵"
+        ];
+
+        let words = [];
+        let score = 0;
+        let timeLeft = 60;
+        let gameActive = false;
+        let canAction = true;
+        let baseBeta = null; // Calibration reference
+        let timerInterval = null;
+
+        // 1. Handle Permissions & Start Countdown
+        async function initGame() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission === 'granted') runCountdown();
+                    else alert("We need sensor access to detect tilts!");
+                } catch (e) { console.error(e); }
+            } else {
+                runCountdown();
+            }
+        }
+
+        function runCountdown() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('countdown-screen').classList.remove('hidden');
+            
+            let count = 3;
+            const interval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    document.getElementById('countdown-number').innerText = count;
+                } else {
+                    clearInterval(interval);
+                    startGame();
+                }
+            }, 1000);
+        }
+
+        // 2. Start Game Logic
+        function startGame() {
+            words = [...WORD_LIST].sort(() => Math.random() - 0.5);
+            score = 0;
+            timeLeft = 60;
+            gameActive = true;
+            
+            document.getElementById('countdown-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            
+            // First orientation reading sets the "calibration"
+            const calibrate = (e) => {
+                baseBeta = e.beta; 
+                window.removeEventListener('deviceorientation', calibrate);
+                window.addEventListener('deviceorientation', handleTilt);
+            };
+            window.addEventListener('deviceorientation', calibrate);
+
+            timerInterval = setInterval(updateTimer, 1000);
+            displayNextWord();
+
+            // Try to keep screen awake
+            if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
+        }
+
+        function updateTimer() {
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft;
+            if (timeLeft <= 0) endGame();
+        }
+
+        function displayNextWord() {
+            if (words.length === 0) words = [...WORD_LIST].sort(() => Math.random() - 0.5);
+            const word = words.pop();
+            document.getElementById('word-display').innerText = word;
+            document.body.className = "text-white flex items-center justify-center h-screen w-screen";
+        }
+
+        // 3. Sensor Handling
+        function handleTilt(event) {
+            if (!gameActive || !canAction || baseBeta === null) return;
+
+            const currentBeta = event.beta;
+            const diff = currentBeta - baseBeta;
+
+            // Sensitivity Threshold: 30 degrees
+            // TILT DOWN (Towards floor)
+            if (diff < -30) {
+                processPoint(true);
+            } 
+            // TILT UP (Towards sky)
+            else if (diff > 30) {
+                processPoint(false);
+            }
+        }
+
+        function processPoint(isCorrect) {
+            canAction = false;
+            
+            if (isCorrect) {
+                score++;
+                document.getElementById('score-counter').innerText = score;
+                document.body.classList.add('bg-correct');
+            } else {
+                document.body.classList.add('bg-pass');
+            }
+
+            // Haptic feedback (1 short buzz for correct, 2 for pass)
+            if (navigator.vibrate) {
+                isCorrect ? navigator.vibrate(150) : navigator.vibrate([100, 50, 100]);
+            }
+
+            setTimeout(() => {
+                displayNextWord();
+                // Cooldown to prevent accidental double-tilt
+                setTimeout(() => { canAction = true; }, 800);
+            }, 500);
+        }
+
+        function endGame() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            window.removeEventListener('deviceorientation', handleTilt);
+            
+            if (navigator.vibrate) navigator.vibrate([400, 100, 400]);
+
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+            document.body.className = "bg-slate-900 text-white flex items-center justify-center h-screen w-screen";
+        }
+    </script>
+</body>
+</html>
