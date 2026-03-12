@@ -9,14 +9,29 @@
         body { touch-action: none; font-family: sans-serif; overflow: hidden; transition: background-color 0.3s ease; }
         .bg-correct { background-color: #22c55e !important; }
         .bg-pass { background-color: #ef4444 !important; }
-        #word-display { text-shadow: 2px 4px 10px rgba(0,0,0,0.3); }
+        
+        /* Force Landscape Warning */
+        #orientation-warning { display: none; }
+        @media screen and (orientation: portrait) {
+            #orientation-warning { 
+                display: flex; position: fixed; inset: 0; background: #1e3a8a; 
+                z-index: 999; flex-direction: column; align-items: center; justify-content: center;
+                text-align: center; padding: 20px;
+            }
+        }
     </style>
 </head>
-<body class="bg-blue-600 text-white flex items-center justify-center h-screen w-screen p-4">
+<body class="bg-blue-600 text-white flex items-center justify-center h-screen w-screen overflow-hidden">
 
-    <div id="start-screen" class="text-center max-w-md">
-        <h1 class="text-5xl font-extrabold mb-4">SCHOOL HEADBANZ 🏫</h1>
-        <p class="mb-8 text-lg opacity-90">Tilt <b>DOWN</b> for Correct ✅<br>Tilt <b>UP</b> to Pass ⏭️</p>
+    <div id="orientation-warning">
+        <span class="text-6xl mb-4">🔄</span>
+        <h2 class="text-2xl font-bold">Please Rotate to Landscape</h2>
+        <p class="opacity-80">The game works best held sideways!</p>
+    </div>
+
+    <div id="start-screen" class="text-center max-w-md p-6">
+        <h1 class="text-5xl font-extrabold mb-4 text-yellow-300">SCHOOL HEADBANZ</h1>
+        <p class="mb-8 text-lg opacity-90">1. Hold phone sideways against forehead<br>2. Tilt DOWN for Correct ✅<br>3. Tilt UP to Pass ⏭️</p>
         <button onclick="requestPermissions()" class="bg-white text-blue-600 px-12 py-5 rounded-full font-black text-2xl shadow-2xl active:scale-95 transition-transform">
             START 60s ROUND
         </button>
@@ -24,44 +39,34 @@
 
     <div id="countdown-screen" class="hidden text-center">
         <div id="countdown-number" class="text-9xl font-black">3</div>
-        <p class="text-2xl mt-4 uppercase tracking-widest">Place on forehead!</p>
+        <p class="text-2xl mt-4 uppercase tracking-widest">To your forehead!</p>
     </div>
 
     <div id="game-screen" class="hidden text-center w-full">
-        <div class="absolute top-6 left-0 w-full flex justify-between px-10 items-center">
-            <div id="timer" class="text-4xl font-mono font-bold bg-black/20 px-4 py-2 rounded-lg">60</div>
-            <div id="score-counter" class="text-4xl font-bold">Score: 0</div>
+        <div class="absolute top-4 left-0 w-full flex justify-between px-10 items-center">
+            <div id="timer" class="text-3xl font-mono font-bold bg-black/30 px-4 py-1 rounded-lg">60</div>
+            <div id="score-counter" class="text-3xl font-bold">Score: 0</div>
         </div>
-        <div id="word-display" class="text-6xl md:text-8xl font-black leading-tight uppercase"></div>
-        <div id="status-hint" class="absolute bottom-10 w-full text-xl opacity-60">Tilt to answer</div>
+        <div id="word-display" class="text-6xl md:text-8xl font-black px-10 leading-none uppercase"></div>
     </div>
 
     <div id="end-screen" class="hidden text-center">
-        <h2 class="text-4xl font-bold mb-2">TIME'S UP! 🔔</h2>
-        <div id="final-score" class="text-8xl font-black my-6">0</div>
-        <p class="text-xl mb-8">Points Scored</p>
-        <button onclick="location.reload()" class="bg-white text-blue-600 px-10 py-4 rounded-full font-bold text-xl">
-            PLAY AGAIN
+        <h2 class="text-3xl font-bold">GAME OVER! 🔔</h2>
+        <div id="final-score" class="text-9xl font-black my-4 text-yellow-300">0</div>
+        <button onclick="location.reload()" class="bg-white text-blue-600 px-10 py-4 rounded-full font-bold text-xl shadow-lg">
+            TRY AGAIN
         </button>
     </div>
 
     <script>
-        const wordList = [
-            "CLASS 🏫", "TAKE-UP 📝", "AGRICULTURE 🚜", "ALGEBRA ➗", 
-            "HUMAN ANATOMY 🦴", "ART 🎨", "AUTO SHOP 🏎️", "BIOLOGY 🧬", 
-            "CHEMISTRY 🧪", "COMPUTER SCIENCE 💻", "COOKING 🧑‍🍳", "DESIGN 📐", 
-            "ENGINEERING ⚙️", "ENGLISH 📚", "GEOMETRY 📐", "HISTORY 📜", 
-            "INTEGRATED MATH 🔢", "MATH ➕", "METAL SHOP 🛠️", "MUSIC/BAND 🎺", 
-            "PE ⚽", "PHYSICS ⚛️", "SCIENCE 🧪", "STATISTICS 📊", 
-            "STUDY 📖", "WOOD SHOP 🪵"
-        ];
+        const wordList = ["CLASS 🏫", "TAKE-UP 📝", "AGRICULTURE 🚜", "ALGEBRA ➗", "HUMAN ANATOMY 🦴", "ART 🎨", "AUTO SHOP 🏎️", "BIOLOGY 🧬", "CHEMISTRY 🧪", "COMPUTER SCIENCE 💻", "COOKING 🧑‍🍳", "DESIGN 📐", "ENGINEERING ⚙️", "ENGLISH 📚", "GEOMETRY 📐", "HISTORY 📜", "INTEGRATED MATH 🔢", "MATH ➕", "METAL SHOP 🛠️", "MUSIC/BAND 🎺", "PE ⚽", "PHYSICS ⚛️", "SCIENCE 🧪", "STATISTICS 📊", "STUDY 📖", "WOOD SHOP 🪵"];
 
         let words = [...wordList];
         let score = 0;
         let timeLeft = 60;
         let gameActive = false;
         let canAction = true;
-        let timerInterval;
+        let baseGamma = 0; // Calibration point
 
         async function requestPermissions() {
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -78,12 +83,8 @@
             let count = 3;
             const countInt = setInterval(() => {
                 count--;
-                if (count > 0) {
-                    document.getElementById('countdown-number').innerText = count;
-                } else {
-                    clearInterval(countInt);
-                    startGame();
-                }
+                if (count > 0) document.getElementById('countdown-number').innerText = count;
+                else { clearInterval(countInt); startGame(); }
             }, 1000);
         }
 
@@ -91,36 +92,37 @@
             words = words.sort(() => Math.random() - 0.5);
             document.getElementById('countdown-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
+            
+            // CALIBRATION: Use the current tilt as the "Zero" point
+            window.addEventListener('deviceorientation', function initial(e) {
+                baseGamma = e.gamma; // Gamma is the tilt when in landscape
+                window.removeEventListener('deviceorientation', initial);
+                window.addEventListener('deviceorientation', handleOrientation);
+            });
+
             gameActive = true;
             nextWord();
-            
-            window.addEventListener('deviceorientation', handleOrientation);
-            
-            timerInterval = setInterval(() => {
-                timeLeft--;
-                document.getElementById('timer').innerText = timeLeft;
-                if (timeLeft <= 0) endGame();
+            setInterval(() => {
+                if(gameActive) {
+                    timeLeft--;
+                    document.getElementById('timer').innerText = timeLeft;
+                    if (timeLeft <= 0) endGame();
+                }
             }, 1000);
-
-            if ('wakeLock' in navigator) navigator.wakeLock.request('screen');
-        }
-
-        function nextWord() {
-            if (words.length === 0) words = [...wordList].sort(() => Math.random() - 0.5);
-            const word = words.pop();
-            document.getElementById('word-display').innerText = word;
-            document.body.className = "bg-blue-600 text-white flex items-center justify-center h-screen";
         }
 
         function handleOrientation(event) {
             if (!gameActive || !canAction) return;
-            const tilt = event.beta; 
 
-            if (tilt < 25) { // TILT DOWN
+            // In Landscape, Gamma is the "Forward/Backward" tilt
+            const currentTilt = event.gamma;
+            const relativeTilt = currentTilt - baseGamma;
+
+            if (relativeTilt < -30) { // TILT DOWN
                 score++;
                 document.getElementById('score-counter').innerText = `Score: ${score}`;
                 triggerAction('bg-correct');
-            } else if (tilt > 155) { // TILT UP
+            } else if (relativeTilt > 30) { // TILT UP
                 triggerAction('bg-pass');
             }
         }
@@ -129,21 +131,24 @@
             canAction = false;
             document.body.classList.add(className);
             if (navigator.vibrate) navigator.vibrate(200);
-
             setTimeout(() => {
                 nextWord();
-                setTimeout(() => { canAction = true; }, 1000); // 1s cooldown
+                setTimeout(() => { canAction = true; }, 1200);
             }, 600);
+        }
+
+        function nextWord() {
+            if (words.length === 0) words = [...wordList].sort(() => Math.random() - 0.5);
+            document.getElementById('word-display').innerText = words.pop();
+            document.body.className = "bg-blue-600 text-white flex items-center justify-center h-screen";
         }
 
         function endGame() {
             gameActive = false;
-            clearInterval(timerInterval);
-            if (navigator.vibrate) navigator.vibrate([500, 100, 500]);
             document.getElementById('game-screen').classList.add('hidden');
             document.getElementById('end-screen').classList.remove('hidden');
             document.getElementById('final-score').innerText = score;
-            document.body.className = "bg-slate-900 text-white flex items-center justify-center h-screen";
+            document.body.className = "bg-slate-900 flex items-center justify-center h-screen";
         }
     </script>
 </body>
