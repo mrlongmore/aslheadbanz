@@ -1,20 +1,21 @@
 function handleOrientation(event) {
             if (!gameActive || !canAction) return;
 
-            // Using 'beta' for vertical tilt in Landscape mode
-            // We use the absolute difference from the start position
+            // In many mobile browsers, when in landscape, 
+            // 'beta' represents the front-to-back tilt.
             const currentTilt = event.beta; 
             const relativeTilt = currentTilt - baseBeta;
 
-            // ADJUSTED DIRECTION:
-            // If tilting down currently passes, swap these two 'if' conditions.
-            if (relativeTilt > 30) { 
-                // TILT DOWN (Towards floor)
+            // SWAPPED LOGIC: 
+            // If tilting towards the floor (down) was 'Pass', 
+            // we now use '<' to make it 'Correct'.
+            if (relativeTilt < -30) { 
+                // TILT DOWN (Towards floor) -> CORRECT
                 score++;
                 document.getElementById('score-counter').innerText = `Score: ${score}`;
-                triggerAction('bg-correct');
-            } else if (relativeTilt < -30) { 
-                // TILT UP (Towards sky)
-                triggerAction('bg-pass');
+                triggerAction('bg-correct', 'CORRECT! ✅');
+            } else if (relativeTilt > 30) { 
+                // TILT UP (Towards sky) -> PASS
+                triggerAction('bg-pass', 'PASS ⏭️');
             }
         }
