@@ -92,9 +92,11 @@
 
     <!-- 1. Start Screen -->
     <div id="start-screen" class="text-center p-6 flex flex-col items-center">
-        <div class="mb-10">
-            <h1 class="text-6xl md:text-8xl font-black italic tracking-tighter text-white drop-shadow-2xl">HEADS<br>UP!</h1>
-            <p class="text-2xl font-bold text-yellow-300 mt-2">School Edition 🏫</p>
+        <div class="heads-up-card mb-8">
+            <div class="text-center">
+                <h1 class="text-4xl md:text-6xl font-black italic tracking-tighter text-blue-600 drop-shadow-lg">ASL<br>UP!</h1>
+                <p class="text-xl font-bold text-yellow-600 mt-2">School Edition 🏫</p>
+            </div>
         </div>
         
         <button onclick="initGame()" class="bg-white text-blue-600 px-16 py-6 rounded-full font-black text-3xl shadow-2xl hover:scale-105 active:scale-95 transition-all">
@@ -118,7 +120,7 @@
         </div>
 
         <div class="absolute bottom-8 text-lg font-bold opacity-50 uppercase tracking-widest">
-            Twist left for Correct • Twist right to Pass
+            Tilt down for Correct • Tilt up to Pass
         </div>
     </div>
 
@@ -140,7 +142,7 @@
         let timeLeft = 60;
         let gameActive = false;
         let canAction = true;
-        let baseGamma = null;
+        let baseBeta = null;
         let timerInterval = null;
 
         const TILT_THRESHOLD = 20;       // degrees you must tilt after calibration
@@ -197,7 +199,7 @@
             
             // Calibration: Find 'flat' relative to how they hold it on forehead
             const calibrate = (e) => {
-                baseGamma = e.gamma; 
+                baseBeta = e.beta; 
                 window.removeEventListener('deviceorientation', calibrate);
                 window.addEventListener('deviceorientation', handleTilt);
             };
@@ -216,16 +218,16 @@
         }
 
         function handleTilt(event) {
-            if (!gameActive || !canAction || baseGamma === null || event.gamma === null) return;
+            if (!gameActive || !canAction || baseBeta === null || event.beta === null) return;
 
-            const diff = event.gamma - baseGamma;
+            const diff = event.beta - baseBeta;
 
             if (Math.abs(diff) < TILT_THRESHOLD) return;
 
-            // Twist left = correct, twist right = pass
-            if (diff < -TILT_THRESHOLD) {
+            // Tilt down = correct, tilt up = pass
+            if (diff > TILT_THRESHOLD) {
                 processPoint(true);
-            } else if (diff > TILT_THRESHOLD) {
+            } else if (diff < -TILT_THRESHOLD) {
                 processPoint(false);
             }
         }
@@ -253,7 +255,7 @@
                 
                 // Must return to center
                 const checkNeutral = (e) => {
-                    if (Math.abs(e.gamma - baseGamma) < NEUTRAL_THRESHOLD) {
+                    if (Math.abs(e.beta - baseBeta) < NEUTRAL_THRESHOLD) {
                         window.removeEventListener('deviceorientation', checkNeutral);
                         canAction = true;
                     }
