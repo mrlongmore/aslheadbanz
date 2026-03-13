@@ -24,7 +24,7 @@
             backdrop-filter: blur(10px);
             border-radius: 40px;
             border: 8px solid rgba(255, 255, 255, 0.3);
-            width: 90vw;
+            width: 80vw;
             height: 70vh;
             display: flex;
             align-items: center;
@@ -34,6 +34,12 @@
 
         .bg-correct { background-color: #4cd137 !important; }
         .bg-pass { background-color: #e84118 !important; }
+        
+        #orientation-warning { 
+            display: none; position: fixed; inset: 0; background: #00a8ff; 
+            z-index: 9999; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 2rem;
+        }
 
         #word-display {
             font-size: clamp(3rem, 10vw, 7rem);
@@ -70,12 +76,19 @@
 
         @media (orientation: landscape) {
             .heads-up-card {
-                height: 60vh;
+                height: 50vh;
             }
         }
     </style>
 </head>
 <body class="text-white flex items-center justify-center">
+
+    <!-- Orientation Overlay -->
+    <div id="orientation-warning">
+        <div class="text-8xl mb-6">📱</div>
+        <h2 class="text-4xl font-black mb-4">PLACE ON FOREHEAD</h2>
+        <p class="text-xl opacity-90 max-w-sm">Hold phone sideways (Landscape) with the screen facing your friends!</p>
+    </div>
 
     <!-- 1. Start Screen -->
     <div id="start-screen" class="text-center p-6 flex flex-col items-center">
@@ -105,7 +118,7 @@
         </div>
 
         <div class="absolute bottom-8 text-lg font-bold opacity-50 uppercase tracking-widest">
-            Tilt down for Correct • Tilt up to Pass
+            Twist left for Correct • Twist right to Pass
         </div>
     </div>
 
@@ -127,11 +140,27 @@
         let timeLeft = 60;
         let gameActive = false;
         let canAction = true;
-        let baseBeta = null;
+        let baseGamma = null;
         let timerInterval = null;
 
         const TILT_THRESHOLD = 20;       // degrees you must tilt after calibration
         const NEUTRAL_THRESHOLD = 12;    // degrees to return to center before next action
+
+        const warningEl = document.getElementById('orientation-warning');
+
+        // Check orientation constantly
+        window.addEventListener('orientationchange', checkOrientation);
+        window.addEventListener('resize', checkOrientation);
+
+        function checkOrientation() {
+            // Horizontal check: window.innerWidth should be greater than window.innerHeight
+            if (window.innerHeight > window.innerWidth) {
+                warningEl.style.display = 'flex';
+            } else {
+                warningEl.style.display = 'none';
+            }
+        }
+        checkOrientation();
 
         async function initGame() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -168,7 +197,7 @@
             
             // Calibration: Find 'flat' relative to how they hold it on forehead
             const calibrate = (e) => {
-                baseBeta = e.beta; 
+                baseGamma = e.gamma; 
                 window.removeEventListener('deviceorientation', calibrate);
                 window.addEventListener('deviceorientation', handleTilt);
             };
@@ -187,16 +216,16 @@
         }
 
         function handleTilt(event) {
-            if (!gameActive || !canAction || baseBeta === null || event.beta === null) return;
+            if (!gameActive || !canAction || baseGamma === null || event.gamma === null) return;
 
-            const diff = event.beta - baseBeta;
+            const diff = event.gamma - baseGamma;
 
             if (Math.abs(diff) < TILT_THRESHOLD) return;
 
-            // Tilt down = correct, tilt up = pass
-            if (diff > TILT_THRESHOLD) {
+            // Twist left = correct, twist right = pass
+            if (diff < -TILT_THRESHOLD) {
                 processPoint(true);
-            } else if (diff < -TILT_THRESHOLD) {
+            } else if (diff > TILT_THRESHOLD) {
                 processPoint(false);
             }
         }
@@ -224,7 +253,7 @@
                 
                 // Must return to center
                 const checkNeutral = (e) => {
-                    if (Math.abs(e.beta - baseBeta) < NEUTRAL_THRESHOLD) {
+                    if (Math.abs(e.gamma - baseGamma) < NEUTRAL_THRESHOLD) {
                         window.removeEventListener('deviceorientation', checkNeutral);
                         canAction = true;
                     }
