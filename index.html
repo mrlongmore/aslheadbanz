@@ -125,7 +125,7 @@
         let timeLeft = 60;
         let gameActive = false;
         let canAction = true;
-        let baseTilt = null;
+        let baseBeta = null;
         let timerInterval = null;
 
         const TILT_THRESHOLD = 20;       // degrees you must tilt after calibration
@@ -137,25 +137,15 @@
         window.addEventListener('orientationchange', checkOrientation);
         window.addEventListener('resize', checkOrientation);
 
-        function isLandscape() {
-            return window.innerWidth > window.innerHeight;
-        }
-
         function checkOrientation() {
-            if (isLandscape()) {
-                warningEl.style.display = 'none';
-            } else {
+            // Horizontal check: window.innerWidth should be greater than window.innerHeight
+            if (window.innerHeight > window.innerWidth) {
                 warningEl.style.display = 'flex';
+            } else {
+                warningEl.style.display = 'none';
             }
         }
         checkOrientation();
-
-        function getTiltValue(event) {
-            if (!event) return null;
-            // Portrait uses beta (front/back tilt), landscape uses gamma.
-            // In landscape on forehead, tilting the forehead down/up affects gamma.
-            return isLandscape() ? event.gamma : event.beta;
-        }
 
         async function initGame() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -192,7 +182,7 @@
             
             // Calibration: Find 'flat' relative to how they hold it on forehead
             const calibrate = (e) => {
-                baseTilt = getTiltValue(e);
+                baseBeta = e.beta; 
                 window.removeEventListener('deviceorientation', calibrate);
                 window.addEventListener('deviceorientation', handleTilt);
             };
@@ -211,16 +201,13 @@
         }
 
         function handleTilt(event) {
-            if (!gameActive || !canAction || baseTilt === null) return;
+            if (!gameActive || !canAction || baseBeta === null || event.beta === null) return;
 
-            const currentTilt = getTiltValue(event);
-            if (currentTilt === null) return;
+            const diff = event.beta - baseBeta;
 
-            const diff = currentTilt - baseTilt;
             if (Math.abs(diff) < TILT_THRESHOLD) return;
 
-            // Tilt down = correct, tilt up = pass. Signing may flip depending on orientation.
-            // For landscape mode, we still use gamma where positive is tilt-down on forehead.
+            // Tilt down = correct, tilt up = pass
             if (diff > TILT_THRESHOLD) {
                 processPoint(true);
             } else if (diff < -TILT_THRESHOLD) {
@@ -251,9 +238,7 @@
                 
                 // Must return to center
                 const checkNeutral = (e) => {
-                    const currentTilt = getTiltValue(e);
-                    if (currentTilt === null) return;
-                    if (Math.abs(currentTilt - baseTilt) < NEUTRAL_THRESHOLD) {
+                    if (Math.abs(e.beta - baseBeta) < NEUTRAL_THRESHOLD) {
                         window.removeEventListener('deviceorientation', checkNeutral);
                         canAction = true;
                     }
