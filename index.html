@@ -128,6 +128,9 @@
         let baseBeta = null;
         let timerInterval = null;
 
+        const TILT_THRESHOLD = 20;       // degrees you must tilt after calibration
+        const NEUTRAL_THRESHOLD = 12;    // degrees to return to center before next action
+
         const warningEl = document.getElementById('orientation-warning');
 
         // Check orientation constantly
@@ -198,14 +201,16 @@
         }
 
         function handleTilt(event) {
-            if (!gameActive || !canAction || baseBeta === null) return;
+            if (!gameActive || !canAction || baseBeta === null || event.beta === null) return;
 
             const diff = event.beta - baseBeta;
 
-            // Thresholds for Heads Up! style feel
-            if (diff < -25) {
+            if (Math.abs(diff) < TILT_THRESHOLD) return;
+
+            // Tilt down = correct, tilt up = pass
+            if (diff > TILT_THRESHOLD) {
                 processPoint(true);
-            } else if (diff > 25) {
+            } else if (diff < -TILT_THRESHOLD) {
                 processPoint(false);
             }
         }
@@ -233,7 +238,7 @@
                 
                 // Must return to center
                 const checkNeutral = (e) => {
-                    if (Math.abs(e.beta - baseBeta) < 12) {
+                    if (Math.abs(e.beta - baseBeta) < NEUTRAL_THRESHOLD) {
                         window.removeEventListener('deviceorientation', checkNeutral);
                         canAction = true;
                     }
